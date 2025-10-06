@@ -1,0 +1,307 @@
+Perfect ✅ — below is a **well-structured documentation-style presentation** of the **“Blue Prism External Job Tracking System”**, written in a clean, professional format.
+It reads like an internal project or architecture document you can include in a PPT, project wiki, or design doc.
+
+---
+
+# 🧭 **Blue Prism External Job Tracking System – Architecture & Workflow Documentation**
+
+---
+
+## 🏗️ **1. Purpose**
+
+Organizations using **Blue Prism** often need to monitor job or process execution **without opening the Blue Prism Control Room**.
+This document outlines a **Python-based monitoring framework** that extracts job statuses from Blue Prism, stores them in a lightweight database, and displays overall and detailed progress on a **web dashboard** built using **Flask** and **SQLite**.
+
+---
+
+## ⚙️ **2. System Overview**
+
+This solution acts as a **stand-alone monitoring dashboard** for Blue Prism.
+It can show:
+
+* Total number of jobs/tasks
+* Completed, Running, Pending, Failed counts
+* Last executed job
+* Next scheduled job
+* Progress bars for each individual task
+* Detailed job execution history (start/end/next execution)
+
+The system automatically synchronizes with Blue Prism’s execution data using **Python scripts** and **API/DB connectors**, then presents the results visually to end users.
+
+---
+
+## 🧩 **3. High-Level Architecture**
+
+```
+             ┌──────────────────────────┐
+             │     Blue Prism System     │
+             │ (Processes, Scheduler, DB)│
+             └─────────────┬─────────────┘
+                           │
+                           ▼
+             ┌──────────────────────────┐
+             │  Data Extraction Layer    │
+             │  (bp_connector.py)        │
+             │  • Fetch job info via API │
+             │    or direct SQL          │
+             └─────────────┬─────────────┘
+                           │
+                           ▼
+             ┌──────────────────────────┐
+             │   Data Storage Layer      │
+             │   (SQLite Database)       │
+             │   • Persist logs          │
+             │   • Track job history     │
+             └─────────────┬─────────────┘
+                           │
+                           ▼
+             ┌──────────────────────────┐
+             │   Flask Application Layer │
+             │   (app.py Backend)        │
+             │   • Compute summary stats │
+             │   • Expose REST endpoints │
+             │   • Serve dashboard HTML  │
+             └─────────────┬─────────────┘
+                           │
+                           ▼
+             ┌──────────────────────────┐
+             │    Frontend UI Layer      │
+             │ (HTML + JS + CSS)         │
+             │ • Display overall summary │
+             │ • Per-task progress bars  │
+             │ • Auto-refresh dashboard  │
+             └─────────────┬─────────────┘
+                           │
+                           ▼
+                     🧑‍💻  **End User**
+        (Views task status in browser – no need to open Blue Prism)
+```
+
+---
+
+## 🧠 **4. Layer-Wise Functional Breakdown**
+
+### 🔹 **A. Blue Prism System**
+
+* Responsible for **executing jobs/processes** (scheduled or manual).
+* Stores execution data such as:
+
+  * Process Name
+  * Session ID
+  * Start / End Time
+  * Current Status (Running, Completed, Failed)
+  * Next Scheduled Run Time
+* This data is the **primary source** for the tracking system.
+
+---
+
+### 🔹 **B. Data Extraction Layer (bp_connector.py)**
+
+* A **Python script** or background service that connects to Blue Prism’s data source.
+* **Two Integration Options:**
+
+  1. **Blue Prism API:**
+     Use REST endpoints like `/sessions`, `/processes` to fetch live job details.
+  2. **Direct Database Access:**
+     Use `pyodbc` or `SQLAlchemy` to query Blue Prism’s SQL Server database (tables like `BPASession`, `BPAProcess`).
+
+**Tasks performed:**
+
+* Fetch latest job runs (status, timestamps, next schedule)
+* Normalize the data (convert timestamps, map statuses)
+* Store or update data in local SQLite DB
+
+**Frequency:**
+Executed periodically (e.g., every 2–5 minutes) via a scheduler or background thread.
+
+---
+
+### 🔹 **C. Data Storage Layer (SQLite Database)**
+
+* Lightweight **local database** (`tracker.db`).
+* Stores structured tables:
+
+  * `job_logs` → For detailed execution logs
+  * `summary_cache` → For latest summarized metrics
+* Maintains **historical logs** for trend visualization.
+* Provides fast read/write for the Flask app.
+
+**Advantages:**
+
+* No external DB dependency
+* Easy portability
+* Simplified backup and analysis
+
+---
+
+### 🔹 **D. Application Layer (Flask Backend)**
+
+* Central web backend for business logic and APIs.
+
+**Key Components:**
+
+1. **Data Loader**
+
+   * Periodically updates SQLite DB from Blue Prism connector.
+
+2. **Aggregator**
+
+   * Calculates real-time statistics:
+
+     * Total Jobs
+     * Running / Completed / Failed / Pending counts
+     * Last Executed Task
+     * Next Scheduled Task
+
+3. **REST API Endpoints**
+
+   * `/api/summary` → Returns overall job statistics
+   * `/api/tasks` → Returns detailed info per job
+   * `/api/task/<id>` → Returns history of a specific job
+
+4. **Flask HTML Renderer**
+
+   * Serves dashboard UI templates to browser
+
+---
+
+### 🔹 **E. Frontend Layer (Web Dashboard)**
+
+* Built using **HTML + CSS + JavaScript (Bootstrap or Tailwind optional)**.
+* Fetches live data via Flask APIs and refreshes periodically.
+
+**Dashboard Sections:**
+
+| Section                    | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| **Overall Summary Panel**  | Shows total tasks, completed, running, failed, pending counts  |
+| **Execution Info Bar**     | Shows “Last Executed” and “Next Scheduled” job names           |
+| **Task Table / Grid View** | Lists each job with progress bar, status, execution timestamps |
+| **Progress Bar Logic**     | Visual indicator for % completion (if available or simulated)  |
+| **Auto Refresh**           | JS timer refreshes data every few seconds                      |
+
+---
+
+## 🧮 **5. Example Dashboard Layout (Conceptual)**
+
+```
+ -------------------------------------------------------------
+|   🔷 Blue Prism Job Monitoring Dashboard                    |
+|-------------------------------------------------------------|
+| Total Tasks: 10 | ✅ Completed: 6 | 🔄 Running: 2 | ⚠️ Failed: 1 | ⏳ Pending: 1 |
+|-------------------------------------------------------------|
+| Last Executed Task: Invoice_Extraction     | 10:45 AM        |
+| Next Scheduled Task: Report_Consolidation  | 12:00 PM        |
+|-------------------------------------------------------------|
+| Task Name           | Status     | Progress | Start | End   | Next Run |
+|-------------------------------------------------------------|
+| Invoice_Extraction   | Completed | ████████ 100% |10:30|10:45|13:00 |
+| Report_Consolidation | Pending   |           0%  | —   | —   |12:00 |
+| Data_Validation      | Running   | ████▁▁▁▁ 60%  |11:00| —   | —   |
+| Email_Notifier       | Failed    | █▁▁▁▁▁▁ 10%   |09:00|09:05|11:00 |
+ -------------------------------------------------------------
+```
+
+---
+
+## 🔁 **6. Data Flow Summary**
+
+| Step | Source           | Action          | Destination             |
+| ---- | ---------------- | --------------- | ----------------------- |
+| 1️⃣  | Blue Prism       | Job executed    | Stored in Blue Prism DB |
+| 2️⃣  | Python Connector | Fetch data      | Python script           |
+| 3️⃣  | SQLite           | Save logs       | Local `tracker.db`      |
+| 4️⃣  | Flask            | Aggregate stats | `/api/summary`          |
+| 5️⃣  | Web Dashboard    | Fetch API       | Rendered on browser     |
+
+---
+
+## 🧰 **7. Technology Stack**
+
+| Layer                        | Tool/Technology                    | Purpose                               |
+| ---------------------------- | ---------------------------------- | ------------------------------------- |
+| **Automation Platform**      | Blue Prism                         | Executes processes and schedules jobs |
+| **Integration**              | Python (`requests`, `pyodbc`)      | Fetch data via API or DB              |
+| **Storage**                  | SQLite                             | Store job data and logs               |
+| **Backend Framework**        | Flask                              | Serve APIs and dashboard              |
+| **Frontend**                 | HTML, CSS, JavaScript              | Display monitoring UI                 |
+| **Visualization (optional)** | Chart.js / Plotly                  | Add charts or time trends             |
+| **Scheduler**                | Python `threading` / `apscheduler` | Background data fetch                 |
+
+---
+
+## 📊 **8. Dashboard KPIs & Data Points**
+
+| Metric                  | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| **Total Jobs**          | Total unique processes tracked                 |
+| **Completed Count**     | Successfully finished jobs                     |
+| **Running Count**       | Currently executing jobs                       |
+| **Pending Count**       | Jobs waiting to start                          |
+| **Failed Count**        | Jobs that ended in failure                     |
+| **Last Executed Task**  | Most recently finished process                 |
+| **Next Scheduled Task** | Next upcoming process                          |
+| **Start/End Time**      | Execution timestamps                           |
+| **Next Execution**      | Next run time (if recurring)                   |
+| **Progress %**          | Completion percentage or elapsed runtime ratio |
+
+---
+
+## 🚀 **9. Workflow Summary (End-to-End)**
+
+```
+1️⃣ Blue Prism runs multiple jobs (automated/scheduled)
+2️⃣ Python connector fetches job & session details
+3️⃣ Data stored and updated in SQLite database
+4️⃣ Flask backend aggregates and exposes APIs
+5️⃣ Web dashboard calls Flask APIs periodically
+6️⃣ UI displays:
+   - Total, Completed, Running, Failed, Pending
+   - Last & Next task info
+   - Per-task progress bars
+7️⃣ End user views all job progress externally
+```
+
+---
+
+## 🔒 **10. Optional Enhancements (Future Scope)**
+
+| Enhancement                   | Description                                  |
+| ----------------------------- | -------------------------------------------- |
+| **FastAPI Migration**         | Async API calls for faster refresh           |
+| **Email/Teams Alerts**        | Notify on job failure or delay               |
+| **User Authentication**       | Secure access for admins or teams            |
+| **Historical Trends**         | Weekly/monthly job statistics                |
+| **Charts & Visual Analytics** | Success/failure trends per job               |
+| **Dockerization**             | Package app for cloud/on-prem deployment     |
+| **Multi-Environment Support** | Handle Dev/Test/Prod environments separately |
+
+---
+
+## 🧾 **11. Summary**
+
+| Feature                 | Description                                           |
+| ----------------------- | ----------------------------------------------------- |
+| **Goal**                | External dashboard to monitor Blue Prism job statuses |
+| **Architecture Type**   | Modular 3-tier (Data → API → UI)                      |
+| **Storage**             | Local SQLite DB for persistence                       |
+| **Frontend**            | Responsive, auto-refreshing dashboard                 |
+| **Backend**             | Flask-based REST + HTML                               |
+| **Integration Options** | Blue Prism API / SQL DB                               |
+| **Benefits**            | Lightweight, portable, scalable, customizable         |
+
+---
+
+## 🧱 **12. Deployment Overview**
+
+| Component           | Host                                       | Description                           |
+| ------------------- | ------------------------------------------ | ------------------------------------- |
+| **Flask Server**    | Windows/Linux (same network as Blue Prism) | Runs backend logic and APIs           |
+| **SQLite Database** | Local file                                 | Stores execution logs                 |
+| **Dashboard UI**    | Browser                                    | Accessible from any device in network |
+| **Blue Prism**      | Internal Automation Server                 | Executes processes                    |
+
+---
+
+Would you like me to include a **diagram in visual format (boxes + arrows)** next — suitable for adding to a presentation slide or documentation page (with clear labels and flow arrows)?
+I can generate that diagram next (clean, readable, exportable).
