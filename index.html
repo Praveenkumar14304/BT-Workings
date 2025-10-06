@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blue Prism Job Tracker</title>
+    <style>
+        body { font-family: Arial; margin: 30px; background: #f5f6f8; }
+        .stats-box { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .card { background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0; font-size: 18px; color: #0078d7; }
+        .card p { margin: 5px 0 0; font-size: 22px; font-weight: bold; }
+        table { border-collapse: collapse; width: 100%; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #0078d7; color: white; }
+        .progress-bar {
+            width: 120px; height: 14px; border-radius: 5px;
+            background: #eee; overflow: hidden; margin: auto;
+        }
+        .progress { height: 100%; background: #4caf50; }
+    </style>
+</head>
+<body>
+    <h2>🔹 Blue Prism Job Tracker Dashboard</h2>
+
+    <!-- Overall Stats -->
+    <div class="stats-box" id="summary">
+        <div class="card"><h3>Total Tasks</h3><p id="total">0</p></div>
+        <div class="card"><h3>Completed</h3><p id="completed">0</p></div>
+        <div class="card"><h3>Running</h3><p id="running">0</p></div>
+        <div class="card"><h3>Pending</h3><p id="pending">0</p></div>
+        <div class="card"><h3>Failed</h3><p id="failed">0</p></div>
+        <div class="card"><h3>Last Executed</h3><p id="lastTask">-</p></div>
+        <div class="card"><h3>Next Execution</h3><p id="nextTask">-</p></div>
+    </div>
+
+    <!-- Job Details -->
+    <table id="jobTable">
+        <thead>
+            <tr>
+                <th>Process Name</th>
+                <th>Status</th>
+                <th>Progress</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Next Execution</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        async function loadData() {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            const s = data.summary;
+
+            // Update stats
+            document.getElementById("total").innerText = s["Total Tasks"];
+            document.getElementById("completed").innerText = s["Completed"];
+            document.getElementById("running").innerText = s["Running"];
+            document.getElementById("pending").innerText = s["Pending"];
+            document.getElementById("failed").innerText = s["Failed"];
+            document.getElementById("lastTask").innerText = s["Last Executed"];
+            document.getElementById("nextTask").innerText = s["Next Scheduled"];
+
+            // Update table
+            const tbody = document.querySelector("#jobTable tbody");
+            tbody.innerHTML = "";
+            data.details.forEach(job => {
+                tbody.innerHTML += `
+                <tr>
+                    <td>${job.ProcessName}</td>
+                    <td>${job.Status}</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress" style="width:${job.Progress}%; background:${job.Status === 'Failed' ? '#f44336' : job.Status === 'Running' ? '#ff9800' : '#4caf50'}"></div>
+                        </div>
+                        ${job.Progress}%
+                    </td>
+                    <td>${job.StartTime || '-'}</td>
+                    <td>${job.EndTime || '-'}</td>
+                    <td>${job.NextRun || '-'}</td>
+                </tr>`;
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
